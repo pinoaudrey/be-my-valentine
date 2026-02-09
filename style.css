@@ -1,0 +1,106 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; /* prevent scroll while playing */
+  background: #0b0f1a;
+  touch-action: none; /* important for mobile */
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.overlay.show {
+  display: flex;
+}
+
+.card {
+  width: min(520px, 92vw);
+  border-radius: 20px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.h1 {
+  font-size: 22px;
+  margin: 0 0 10px 0;
+  line-height: 1.25;
+}
+
+.p {
+  margin: 0 0 14px 0;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.small {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn {
+  appearance: none;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 16px;
+  font-weight: 650;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.90);
+  color: rgba(10, 12, 18, 0.95);
+}
+
+.btn.secondary {
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.corner {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+}
+
+.iconBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.90);
+  font-size: 18px;
+  cursor: pointer;
+}
