@@ -376,13 +376,9 @@
     if (!player.x && !player.y) {
       player.x = w * 0.5;
       player.y = h * 0.60;
-      player.tx = player.x;
-      player.ty = player.y;
     }
     player.x = clamp(player.x, margin, w - margin);
     player.y = clamp(player.y, margin, h - margin);
-    if (player.tx != null) player.tx = clamp(player.tx, margin, w - margin);
-    if (player.ty != null) player.ty = clamp(player.ty, margin, h - margin);
     if (heart.alive) {
       heart.x = clamp(heart.x, margin, w - margin);
       heart.y = clamp(heart.y, margin, h - margin);
@@ -420,7 +416,6 @@
   function setState(next) {
     state = next;
     // Clear movement inputs on state change
-    player.tx = null; player.ty = null;
     playerMoving = false;
     renderOverlayForState();
   }
@@ -565,7 +560,7 @@
             <button class="btn" data-action="start">Play</button>
             <button class="btn secondary" data-action="how">How to play</button>
           </div>
-          <p class="p small" style="margin-top:12px">Tip: use arrow keys, WASD, the joystick, or tap to move.</p>
+          <p class="p small" style="margin-top:12px">Tip: use arrow keys, WASD, or the joystick to move.</p>
         </div>
       `);
       return;
@@ -642,7 +637,7 @@
       showOverlay(`
         <div class="card">
           <div class="h1">How to play</div>
-          <p class="p">Use arrow keys / WASD, the on-screen joystick, or tap to move. Collect the heart. Read the reason. Repeat.</p>
+          <p class="p">Use arrow keys / WASD or the on-screen joystick to move. Collect the heart. Read the reason. Repeat.</p>
           <div class="row">
             <button class="btn" data-action="backToStart">Got it</button>
           </div>
@@ -722,8 +717,6 @@
     particles.length = 0;
     player.x  = w * 0.5;
     player.y  = h * 0.60;
-    player.tx = player.x;
-    player.ty = player.y;
     playerDir = DIR.DOWN;
     playerMoving = false;
     endingTimer = 0;
@@ -889,14 +882,14 @@
     return { dx: dx / len, dy: dy / len };
   }
 
-  // ── Virtual Joystick (touch) ──
-  let joyTouchId = null;
+  // ── Virtual Joystick (pointer events — works for both mouse & touch) ──
+  let joyPointerId = null;   // tracks the pointer currently driving the joystick
 
   function isInsideJoystick(cx, cy) {
     return dist(cx, cy, joy.cx, joy.cy) <= joy.baseR * 1.4;
   }
 
-  function updateJoystickFromTouch(cx, cy) {
+  function updateJoystickFromPointer(cx, cy) {
     const dx = cx - joy.cx;
     const dy = cy - joy.cy;
     const d  = Math.hypot(dx, dy);
@@ -914,86 +907,47 @@
     joy.active = true;
   }
 
-  canvas.addEventListener("touchstart", e => {
+  function releaseJoystick() {
+    joyPointerId = null;
+    joy.active = false;
+    joy.dx = 0; joy.dy = 0;
+    joy.tx = joy.cx; joy.ty = joy.cy;
+  }
+
+  canvas.addEventListener("pointerdown", e => {
     if (state !== State.PLAYING) return;
-    for (const touch of e.changedTouches) {
-      const rect = canvas.getBoundingClientRect();
-      const cx = touch.clientX - rect.left;
-      const cy = touch.clientY - rect.top;
-      if (isInsideJoystick(cx, cy)) {
-        joyTouchId = touch.identifier;
-        updateJoystickFromTouch(cx, cy);
-        e.preventDefault();
-        return;
-      }
-    }
-  }, { passive: false });
-
-  canvas.addEventListener("touchmove", e => {
-    if (state !== State.PLAYING) return;
-    for (const touch of e.changedTouches) {
-      if (touch.identifier === joyTouchId) {
-        const rect = canvas.getBoundingClientRect();
-        updateJoystickFromTouch(touch.clientX - rect.left, touch.clientY - rect.top);
-        e.preventDefault();
-        return;
-      }
-    }
-  }, { passive: false });
-
-  canvas.addEventListener("touchend", e => {
-    for (const touch of e.changedTouches) {
-      if (touch.identifier === joyTouchId) {
-        joyTouchId = null;
-        joy.active = false;
-        joy.dx = 0; joy.dy = 0;
-        joy.tx = joy.cx; joy.ty = joy.cy;
-        return;
-      }
-    }
-  }, { passive: true });
-
-  canvas.addEventListener("touchcancel", e => {
-    for (const touch of e.changedTouches) {
-      if (touch.identifier === joyTouchId) {
-        joyTouchId = null;
-        joy.active = false;
-        joy.dx = 0; joy.dy = 0;
-        joy.tx = joy.cx; joy.ty = joy.cy;
-        return;
-      }
-    }
-  }, { passive: true });
-
-  // ── Tap / Click to move (fallback) ──
-  function getCanvasPos(e) {
     const rect = canvas.getBoundingClientRect();
-    const margin = safeMargin();
-    return {
-      x: clamp(e.clientX - rect.left, margin, w - margin),
-      y: clamp(e.clientY - rect.top,  margin, h - margin)
-    };
-  }
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
 
-  function onPointerDown(e) {
-    if (state !== State.PLAYING) return;
-    // Don't set tap target if using joystick touch
-    if (e.pointerType === "touch") {
-      const rect = canvas.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      if (isInsideJoystick(cx, cy)) return;
+    // If pointer lands on the joystick, capture it for joystick control
+    if (isInsideJoystick(cx, cy)) {
+      joyPointerId = e.pointerId;
+      canvas.setPointerCapture(e.pointerId);
+      updateJoystickFromPointer(cx, cy);
+      return;
     }
-    const pos = getCanvasPos(e);
-    player.tx = pos.x;
-    player.ty = pos.y;
-  }
+  });
 
+  canvas.addEventListener("pointermove", e => {
+    if (e.pointerId === joyPointerId) {
+      const rect = canvas.getBoundingClientRect();
+      updateJoystickFromPointer(e.clientX - rect.left, e.clientY - rect.top);
+    }
+  });
+
+  canvas.addEventListener("pointerup", e => {
+    if (e.pointerId === joyPointerId) releaseJoystick();
+  });
+
+  canvas.addEventListener("pointercancel", e => {
+    if (e.pointerId === joyPointerId) releaseJoystick();
+  });
+
+  // Prevent scroll while playing on touch devices
   document.addEventListener("touchmove", e => {
     if (state === State.PLAYING) e.preventDefault();
   }, { passive: false });
-
-  canvas.addEventListener("pointerdown", onPointerDown, { passive: true });
 
   // Mute button
   const corner = document.createElement("div");
@@ -1056,23 +1010,11 @@
     let moveX = 0, moveY = 0;
     const kdir = getKeyboardDir();
     if (kdir) {
-      // Keyboard: clear any tap target so it doesn't fight
-      player.tx = null; player.ty = null;
       moveX = kdir.dx;
       moveY = kdir.dy;
     } else if (joy.active && (joy.dx !== 0 || joy.dy !== 0)) {
-      player.tx = null; player.ty = null;
       moveX = joy.dx;
       moveY = joy.dy;
-    } else if (player.tx != null && player.ty != null) {
-      // Tap-to-move
-      const dx = player.tx - player.x;
-      const dy = player.ty - player.y;
-      const d  = Math.hypot(dx, dy);
-      if (d > 2) {
-        moveX = dx / d;
-        moveY = dy / d;
-      }
     }
 
     // ── Apply movement ──
@@ -1224,17 +1166,6 @@
     ctx.font = `600 ${fs}px system-ui`;
     ctx.fillText(`${collected} / ${reasons.length}`, 14 + Math.round(fs * 0.95), 28);
     ctx.globalAlpha = 1;
-
-    // Target indicator (tap-to-move only)
-    if (state === State.PLAYING && player.tx != null && player.ty != null) {
-      ctx.globalAlpha = 0.2;
-      ctx.beginPath();
-      ctx.arc(player.tx, player.ty, Math.max(10, player.r * 0.55), 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255, 180, 200, 0.6)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
 
     // Virtual joystick
     if (state === State.PLAYING) {
