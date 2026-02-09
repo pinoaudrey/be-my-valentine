@@ -133,8 +133,6 @@ html, body {
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   border-radius: 10px;
-  border: 2px solid rgba(255, 120, 170, 0.22);
-  background: rgba(255, 120, 170, 0.04);
 }
 
 .portrait-name {
@@ -148,6 +146,31 @@ html, body {
 .dialogue-text {
   flex: 1;
   min-width: 0;
+  position: relative;
+  background: rgba(255, 120, 170, 0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+/* Speech bubble tail pointing toward Audrey (left side) */
+.dialogue-text::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 8px solid transparent;
+  border-right-color: rgba(255, 120, 170, 0.08);
+  border-left: 0;
+}
+
+.dialogue-speaker {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 170, 200, 0.65);
+  margin-bottom: 6px;
 }
 
 .dialogue-reason {

@@ -577,14 +577,13 @@
           <div class="dialogue-body">
             <div class="portrait-slot">
               ${ap ? `<img class="portrait" src="${ap}" alt="Audrey">` : ""}
-              <span class="portrait-name">Audrey</span>
             </div>
             <div class="dialogue-text">
+              <div class="dialogue-speaker">Audrey</div>
               <p class="dialogue-reason">\u201C${escapeHtml(reasonText)}\u201D</p>
             </div>
             <div class="portrait-slot">
               ${lp ? `<img class="portrait" src="${lp}" alt="Leah">` : ""}
-              <span class="portrait-name">Leah</span>
             </div>
           </div>
           <div class="row" style="justify-content:center">
@@ -682,6 +681,7 @@
               ${ap ? `<img class="portrait" src="${ap}" alt="Audrey">` : ""}
             </div>
             <div class="dialogue-text">
+              <div class="dialogue-speaker">Audrey</div>
               <p class="dialogue-reason">Happy Valentine\u2019s Day, ${HER_NAME}. I am taking you on a proper date.</p>
               <p class="p small" style="margin-top:8px">Now screenshot this and hold it over my head forever.</p>
             </div>
