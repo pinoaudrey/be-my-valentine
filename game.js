@@ -380,23 +380,11 @@
   const ENDING_WALK_DUR = 2.0;
   const ENDING_REACT_DUR = 1.0;
 
-  // Background floating hearts
-  const bgHearts = [];
-  let bgTime = 0;
-
-  function initBgHearts() {
-    bgHearts.length = 0;
-    for (let i = 0; i < 35; i++) {
-      bgHearts.push({
-        x: Math.random(),
-        y: Math.random(),
-        size: 3 + Math.random() * 5,
-        speed: 0.02 + Math.random() * 0.04,
-        alpha: 0.05 + Math.random() * 0.10,
-        phase: Math.random() * Math.PI * 2
-      });
-    }
-  }
+  // Meadow background objects
+  const clouds = [];
+  const petals = [];
+  const flowers = [];
+  let bgCache = null; // offscreen canvas cache for static background
 
   /* ═══════════════════════════════════════════
      RESIZE
@@ -417,7 +405,7 @@
     player.r = Math.max(10, scaleUnit * 0.03);
     heart.r  = Math.max(10, scaleUnit * 0.028);
     // Speed tuned so walk animation stride matches movement distance
-    player.speed = Math.max(120, scaleUnit * 0.36);
+    player.speed = Math.max(120, scaleUnit * 0.38);
 
     // Virtual joystick sizing (bottom-left corner)
     joy.baseR = Math.max(36, scaleUnit * 0.07);
@@ -440,16 +428,143 @@
       heart.y = clamp(heart.y, margin, h - margin);
     }
     if (state !== State.LOADING) renderOverlayForState();
+    initMeadow();
   }
 
   /* ═══════════════════════════════════════════
      UTILITY
      ═══════════════════════════════════════════ */
-  function safeMargin() { return Math.max(16, scaleUnit * 0.06); }
+  function safeMargin() { return Math.max(16, scaleUnit * 0.07); }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function dist(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
   function rand(a, b) { return a + Math.random() * (b - a); }
   function lerp(a, b, t) { return a + (b - a) * t; }
+
+  /* ═══════════════════════════════════════════
+     MEADOW BACKGROUND
+     ═══════════════════════════════════════════ */
+  function initMeadow() {
+    clouds.length = 0;
+    petals.length = 0;
+    const nClouds = Math.max(6, Math.floor(w / 220));
+    for (let i = 0; i < nClouds; i++) clouds.push(makeCloud(true));
+    const nPetals = Math.max(18, Math.floor((w * h) / 60000));
+    for (let i = 0; i < nPetals; i++) petals.push(makePetal(true));
+
+    // Pre-generate fixed flower positions on the ground
+    flowers.length = 0;
+    const groundTop = h * 0.80;
+    const flowerCount = Math.max(18, Math.floor(w / 40));
+    for (let i = 0; i < flowerCount; i++) {
+      flowers.push({
+        x: (i * 47) % w,
+        y: rand(groundTop + 8, h - 10),
+        s: rand(scaleUnit * 0.010, scaleUnit * 0.017)
+      });
+    }
+    // Render entire static background to an offscreen canvas
+    renderBgCache();
+  }
+
+  function makeCloud(randomizeX) {
+    const s = rand(scaleUnit * 0.10, scaleUnit * 0.22);
+    return {
+      x: randomizeX ? rand(-w * 0.2, w * 1.2) : rand(0, w),
+      y: rand(h * 0.06, h * 0.35),
+      w: s * rand(1.4, 2.0),
+      h: s * rand(0.55, 0.85),
+      vx: rand(6, 18)
+    };
+  }
+
+  function makePetal(randomizePos) {
+    const size = rand(scaleUnit * 0.008, scaleUnit * 0.016);
+    return {
+      x: randomizePos ? rand(0, w) : -20,
+      y: randomizePos ? rand(0, h) : rand(h * 0.08, h * 0.75),
+      vx: rand(10, 40),
+      vy: rand(8, 28),
+      rot: rand(0, Math.PI * 2),
+      vr: rand(-2.2, 2.2),
+      s: size,
+      phase: rand(0, Math.PI * 2)
+    };
+  }
+
+  function drawRoundedCloud(x, y, cw, ch, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.beginPath();
+    const r1 = ch * 0.55;
+    const r2 = ch * 0.65;
+    const r3 = ch * 0.50;
+    ctx.arc(x + cw * 0.28, y + ch * 0.55, r1, 0, Math.PI * 2);
+    ctx.arc(x + cw * 0.48, y + ch * 0.40, r2, 0, Math.PI * 2);
+    ctx.arc(x + cw * 0.70, y + ch * 0.55, r3, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawHill(yBase, height, color, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    const step = w / 4;
+    ctx.lineTo(0, yBase);
+    ctx.quadraticCurveTo(step * 0.5, yBase - height * 0.9, step, yBase);
+    ctx.quadraticCurveTo(step * 1.5, yBase + height * 0.4, step * 2, yBase);
+    ctx.quadraticCurveTo(step * 2.5, yBase - height * 0.7, step * 3, yBase);
+    ctx.quadraticCurveTo(step * 3.5, yBase + height * 0.35, w, yBase);
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawFlower(x, y, s) {
+    ctx.save();
+    ctx.translate(x, y);
+    // Stem
+    ctx.globalAlpha = 0.75;
+    ctx.strokeStyle = "rgba(60, 170, 90, 0.85)";
+    ctx.lineWidth = Math.max(1, s * 0.2);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, s * 2.2);
+    ctx.stroke();
+    // Petals
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+    const pr = s * 0.55;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * s * 0.55, Math.sin(a) * s * 0.55, pr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Center
+    ctx.fillStyle = "rgba(255, 225, 120, 0.95)";
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPetal(p) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = "rgba(255, 150, 190, 0.70)";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, p.s * 0.9, p.s * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 
   function spawnHeart() {
     const margin = safeMargin();
@@ -635,7 +750,6 @@
               ${ap ? `<img class="portrait" src="${ap}" alt="Audrey">` : ""}
             </div>
             <div class="dialogue-text">
-              <div class="dialogue-speaker">Audrey</div>
               <p class="dialogue-reason">\u201C${escapeHtml(reasonText)}\u201D</p>
             </div>
             <div class="portrait-slot">
@@ -1030,8 +1144,6 @@
   }
 
   function update(dt) {
-    bgTime += dt;
-
     if (heart.alive) heart.bobT += dt * 3.2;
 
     // Particles
@@ -1182,39 +1294,109 @@
 
   /* ── Drawing helpers ── */
 
-  function drawBackground() {
-    const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, "#1a0f18");
-    g.addColorStop(1, "#1a1030");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
+  function renderBgCache() {
+    // Render the entire static background to an offscreen canvas once
+    const off = document.createElement("canvas");
+    off.width = w; off.height = h;
+    const oc = off.getContext("2d");
 
-    // Floating mini hearts (parallax drift)
-    for (const bh of bgHearts) {
-      const rawY = ((bh.y - bh.speed * bgTime) % 1.4 + 1.4) % 1.4 - 0.2;
-      const px = (bh.x + Math.sin(bgTime * 0.4 + bh.phase) * 0.03) * w;
-      const py = rawY * h;
-      ctx.globalAlpha = bh.alpha;
-      drawMiniHeart(px, py, bh.size);
+    // Sky gradient
+    const sky = oc.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0.0, "#bfe8ff");
+    sky.addColorStop(0.55, "#ffd1e6");
+    sky.addColorStop(1.0, "#fff2c6");
+    oc.fillStyle = sky;
+    oc.fillRect(0, 0, w, h);
+
+    // Soft sun glow
+    const sunX = w * 0.80, sunY = h * 0.18, sunR = scaleUnit * 0.28;
+    const sun = oc.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
+    sun.addColorStop(0.0, "rgba(255, 250, 210, 0.95)");
+    sun.addColorStop(0.35, "rgba(255, 230, 190, 0.55)");
+    sun.addColorStop(1.0, "rgba(255, 210, 230, 0.0)");
+    oc.fillStyle = sun;
+    oc.fillRect(0, 0, w, h);
+
+    // Clouds
+    for (const c of clouds) {
+      oc.save();
+      oc.globalAlpha = 0.85;
+      oc.fillStyle = "rgba(255,255,255,0.92)";
+      oc.beginPath();
+      oc.arc(c.x + c.w * 0.28, c.y + c.h * 0.55, c.h * 0.55, 0, Math.PI * 2);
+      oc.arc(c.x + c.w * 0.48, c.y + c.h * 0.40, c.h * 0.65, 0, Math.PI * 2);
+      oc.arc(c.x + c.w * 0.70, c.y + c.h * 0.55, c.h * 0.50, 0, Math.PI * 2);
+      oc.closePath();
+      oc.fill();
+      oc.restore();
     }
-    ctx.globalAlpha = 1;
+
+    // Far hills
+    function hill(yBase, height, color) {
+      oc.fillStyle = color;
+      oc.beginPath();
+      oc.moveTo(0, h);
+      const step = w / 4;
+      oc.lineTo(0, yBase);
+      oc.quadraticCurveTo(step * 0.5, yBase - height * 0.9, step, yBase);
+      oc.quadraticCurveTo(step * 1.5, yBase + height * 0.4, step * 2, yBase);
+      oc.quadraticCurveTo(step * 2.5, yBase - height * 0.7, step * 3, yBase);
+      oc.quadraticCurveTo(step * 3.5, yBase + height * 0.35, w, yBase);
+      oc.lineTo(w, h);
+      oc.closePath();
+      oc.fill();
+    }
+    hill(h * 0.72, scaleUnit * 0.10, "rgba(120, 220, 180, 0.55)");
+    hill(h * 0.78, scaleUnit * 0.12, "rgba(90, 210, 160, 0.65)");
+
+    // Ground band
+    const groundTop = h * 0.80;
+    const ground = oc.createLinearGradient(0, groundTop, 0, h);
+    ground.addColorStop(0.0, "rgba(120, 235, 170, 0.95)");
+    ground.addColorStop(1.0, "rgba(70, 200, 135, 0.98)");
+    oc.fillStyle = ground;
+    oc.fillRect(0, groundTop, w, h - groundTop);
+
+    // Flowers
+    for (const f of flowers) {
+      oc.save();
+      oc.translate(f.x, f.y);
+      // Stem
+      oc.globalAlpha = 0.75;
+      oc.strokeStyle = "rgba(60, 170, 90, 0.85)";
+      oc.lineWidth = Math.max(1, f.s * 0.2);
+      oc.beginPath(); oc.moveTo(0, 0); oc.lineTo(0, f.s * 2.2); oc.stroke();
+      // Petals
+      oc.globalAlpha = 0.95;
+      oc.fillStyle = "rgba(255, 255, 255, 0.95)";
+      const pr = f.s * 0.55;
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        oc.beginPath();
+        oc.arc(Math.cos(a) * f.s * 0.55, Math.sin(a) * f.s * 0.55, pr, 0, Math.PI * 2);
+        oc.fill();
+      }
+      // Center
+      oc.fillStyle = "rgba(255, 225, 120, 0.95)";
+      oc.beginPath(); oc.arc(0, 0, f.s * 0.45, 0, Math.PI * 2); oc.fill();
+      oc.restore();
+    }
+
+    // Light vignette
+    oc.globalAlpha = 0.12;
+    const v = oc.createRadialGradient(w * 0.5, h * 0.5, scaleUnit * 0.15, w * 0.5, h * 0.5, scaleUnit * 0.80);
+    v.addColorStop(0, "rgba(255,255,255,0)");
+    v.addColorStop(1, "rgba(255, 170, 210, 0.35)");
+    oc.fillStyle = v;
+    oc.fillRect(0, 0, w, h);
+
+    bgCache = off;
   }
 
-  function drawMiniHeart(x, y, s) {
-    ctx.save();
-    ctx.translate(x, y);
-    const sc = s / 16;
-    ctx.scale(sc, sc);
-    ctx.beginPath();
-    ctx.moveTo(0, 4);
-    ctx.bezierCurveTo(0, -1, -10, -1, -10, 4);
-    ctx.bezierCurveTo(-10, 11, 0, 16, 0, 20);
-    ctx.bezierCurveTo(0, 16, 10, 11, 10, 4);
-    ctx.bezierCurveTo(10, -1, 0, -1, 0, 4);
-    ctx.closePath();
-    ctx.fillStyle = "rgba(255, 120, 170, 0.7)";
-    ctx.fill();
-    ctx.restore();
+  function drawBackground() {
+    if (bgCache) {
+      ctx.drawImage(bgCache, 0, 0);
+    }
   }
 
   function drawHud() {
@@ -1225,12 +1407,12 @@
     ctx.globalAlpha = 0.9;
 
     // Heart icon via text
-    ctx.fillStyle = "rgba(255, 120, 170, 0.95)";
+    ctx.fillStyle = "rgba(220, 50, 100, 0.90)";
     ctx.font = `${Math.round(fs * 1.1)}px system-ui`;
     ctx.fillText("\u2665", 14, 28);
 
     // Count
-    ctx.fillStyle = "rgba(255, 200, 220, 0.90)";
+    ctx.fillStyle = "rgba(40, 30, 60, 0.90)";
     ctx.font = `600 ${fs}px system-ui`;
     ctx.fillText(`${collected} / ${reasons.length}`, 14 + Math.round(fs * 0.95), 28);
     ctx.globalAlpha = 1;
@@ -1353,7 +1535,6 @@
      ═══════════════════════════════════════════ */
   window.addEventListener("resize", resize, { passive: true });
   resize();
-  initBgHearts();
   drawLoadingScreen(0);
 
   loadAssets().then(() => {
