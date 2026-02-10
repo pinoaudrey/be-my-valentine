@@ -9,12 +9,12 @@
   // 7 reasons
   const reasons = [
     "You're so thoughtful. The flowers, the pretzel delights you always make me, the Murdle book. It's like you're always thinking about me, even when I don't ask.",
-    "Everything is more fun with you. Watching TV, playing games, arts and crafts, even doing absolutely nothing somehow ends up being my favorite part of the day.",
+    "I never get bored with you. Even our lazy do-nothing days are secretly the best days.",
     "You're so funny. You dish the sass right back, match my wit, and somehow always catch me off guard in the best way.",
-    "You inspire me. You make me want to learn more, think deeper, and actually challenge my brain. And half the time, you know what I'm thinking before I even do.",
-    "With you, I get to be fully myself. No pretending, no shrinking, no feeling judged. Just me, exactly as I am, and that feels really rare.",
-    "You have the cutest cat ever. And yes, this is a direct shoutout to Cosima. I refuse to elaborate.",
-    "You make me feel like the most special girl in the world. Not in a big dramatic way. Just in the quiet, everyday way that actually matters."
+    "Talking to you makes my brain work harder in the best way. And somehow you still finish my sentences.",
+    "You let me be fully me \u2014 weird, unfiltered, all of it. And that honestly means more than anything.",
+    "Cosima. That\u2019s it. That\u2019s the reason.",
+    "It\u2019s the little everyday things with you that make me feel so chosen, I never have to wonder."
   ];
 
   // Portrait emotion indices per reason
@@ -484,7 +484,7 @@
     // Virtual joystick sizing (bottom-left corner)
     joy.baseR = Math.max(36, scaleUnit * 0.07);
     joy.knobR = joy.baseR * 0.45;
-    joy.cx = safeMargin() + joy.baseR + 16;
+    joy.cx = w - safeMargin() - joy.baseR - 16;
     joy.cy = h - safeMargin() - joy.baseR - 16;
 
     spriteH = Math.max(56, scaleUnit * 0.12);
