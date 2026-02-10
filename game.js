@@ -37,7 +37,9 @@
     leahReaction:    "assets/leah_heart_reaction.png",
     audreyWalk:      "assets/audrey_casual_red_outfit.png",
     audreyPortraits: "assets/audrey_portraits.png",
-    audreyReaction:  "assets/audrey_heart_reaction.png"
+    audreyReaction:  "assets/audrey_heart_reaction.png",
+    audreyKiss:      "assets/audrey_kiss_right.png",
+    leahKiss:        "assets/leah_kiss_right.png"
   };
 
   const sprites = {};
@@ -389,6 +391,7 @@
   const WALK_COLS = 5, WALK_ROWS = 3;
   const PORTRAIT_COLS = 7;
   const REACTION_COLS = 4, REACTION_ROWS = 1;
+  const KISS_COLS = 4, KISS_ROWS = 1;
 
   // Walk rows: 0=down, 1=left, 2=up   Right = flip row 1
   const DIR = { DOWN: 0, LEFT: 1, UP: 2, RIGHT: 3 };
@@ -427,6 +430,8 @@
   let leahReactionAnim = null;
   let audreyWalkAnim = null;
   let audreyReactionAnim = null;
+  let audreyKissAnim = null;
+  let leahKissAnim = null;
 
   let playerDir = DIR.DOWN;
   let playerMoving = false;
@@ -713,6 +718,7 @@
 
   function hideOverlay() {
     overlay.classList.remove("show");
+    overlay.classList.remove("transparent");
     overlay.innerHTML = "";
   }
 
@@ -931,9 +937,8 @@
     if (action === "start")       { startGame(); return; }
 
     if (action === "nextReason") {
-      // After all reasons shown, spawn the 7th (final) heart
-      setState(State.PLAYING);
-      spawnHeart();
+      // DEBUG: skip straight to ending scene after first heart
+      startEndingScene();
       return;
     }
 
@@ -1050,9 +1055,24 @@
       if (endingTimer >= ENDING_REACT_DUR) {
         endingPhase = 3;
         endingTimer = 0;
-        popConfettiBurst(cx, h * 0.35, 100);
+        // Move characters closer together for kiss
+        const kissGap = spriteW * 0.15;
+        audreyEndX = cx - kissGap - spriteW * 0.5;
+        leahEndX   = cx + kissGap - spriteW * 0.5;
+        if (audreyKissAnim) { audreyKissAnim.loop = false; audreyKissAnim.reset(true); }
+        if (leahKissAnim)   { leahKissAnim.loop = false; leahKissAnim.reset(true); }
       }
     } else if (endingPhase === 3) {
+      // Kiss animation
+      if (audreyKissAnim) audreyKissAnim.update(dt);
+      if (leahKissAnim)   leahKissAnim.update(dt);
+
+      if (endingTimer >= 1.2) {
+        endingPhase = 4;
+        endingTimer = 0;
+        popConfettiBurst(cx, h * 0.35, 100);
+      }
+    } else if (endingPhase === 4) {
       // Confetti pause, then show final card
       if (endingTimer >= 0.6) {
         setState(State.ENDING);
@@ -1061,14 +1081,12 @@
   }
 
   function showEndingQuestion() {
+    // Only show floating buttons — question text is drawn on canvas
+    overlay.classList.add("transparent");
     showOverlay(`
-      <div class="card">
-        <div class="h1">${HER_NAME}, will you be my Valentine? <span class="heart-icon">\u2665</span></div>
-        <p class="p">No pressure. Except yes, pressure. Romantic pressure.</p>
-        <div class="row" style="justify-content:center">
-          <button class="btn" data-action="endingYes">Yes</button>
-          <button class="btn secondary" data-action="endingYes">Absolutely yes</button>
-        </div>
+      <div style="position:fixed;bottom:35%;left:0;right:0;display:flex;justify-content:center;gap:10px;">
+        <button class="btn" data-action="endingYes">Yes</button>
+        <button class="btn secondary" data-action="endingYes">Absolutely yes</button>
       </div>
     `);
   }
@@ -1083,10 +1101,11 @@
         leahWalkAnim.draw(ctx, leahEndX, leahEndY - spriteH, spriteW, spriteH, true);
       }
     } else if (endingPhase === 1) {
-      // Phase 1: Idle front-facing sprites while Valentine question is shown
+      // Phase 1: Idle front-facing sprites with question text on canvas
       drawEndingIdleSprites();
-    } else {
-      // Phase 2+: Heart reaction sprites REPLACE the walk sprites entirely
+      drawEndingQuestionText();
+    } else if (endingPhase === 2) {
+      // Phase 2: Heart reaction sprites REPLACE the walk sprites entirely
       const rW = spriteH * 1.1;
       const frameAR = leahReactionAnim ? (leahReactionAnim.frameH / leahReactionAnim.frameW) : 1;
       const rH = rW * frameAR;
@@ -1094,6 +1113,9 @@
       // Audrey at full size, Leah scaled down slightly to match
       drawEndingReaction(audreyReactionAnim, sprites.audreyReaction, audreyEndX, audreyEndY, rW, rH, "audrey");
       drawEndingReaction(leahReactionAnim, sprites.leahReaction, leahEndX, leahEndY, rW * 0.9, rH * 0.9, "leah");
+    } else {
+      // Phase 3+: Kiss animation
+      drawEndingKiss();
     }
   }
 
@@ -1104,15 +1126,56 @@
 
   function drawEndingIdleSprite(who) {
     const isAudrey = who === "audrey";
-    const img = isAudrey ? sprites.audreyWalk : sprites.leahWalk;
+    const anim = isAudrey ? audreyWalkAnim : leahWalkAnim;
     const ex = isAudrey ? audreyEndX : leahEndX;
     const ey = isAudrey ? audreyEndY : leahEndY;
-    if (!img) return;
+    if (!anim) return;
+    // Temporarily set to front-facing idle (row 0, frame 0) and draw
+    const savedRow = anim.row;
+    const savedFrame = anim.frame;
+    anim.row = 0;
+    anim.frame = 0;
+    anim.draw(ctx, ex, ey - spriteH, spriteW, spriteH, false);
+    anim.row = savedRow;
+    anim.frame = savedFrame;
+  }
+
+  function drawEndingQuestionText() {
+    const cx = (audreyEndX + spriteW * 0.5 + leahEndX + spriteW * 0.5) / 2;
+    const topY = Math.min(audreyEndY, leahEndY) - spriteH;
+
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    const fw = img.width / WALK_COLS;
-    const fh = img.height / WALK_ROWS;
-    ctx.drawImage(img, 0, 0, fw, fh, ex, ey - spriteH, spriteW, spriteH);
+
+    // Main question with heart on the left
+    const mainFs = Math.max(18, scaleUnit * 0.032);
+    const heartFs = Math.round(mainFs * 1.1);
+    const questionText = `${HER_NAME}, will you be my Valentine?`;
+
+    ctx.font = `700 ${mainFs}px system-ui`;
+    const textW = ctx.measureText(questionText).width;
+    ctx.font = `${heartFs}px system-ui`;
+    const heartW = ctx.measureText("\u2665").width;
+    const totalW = heartW + 8 + textW; // heart + gap + text
+    const startX = cx - totalW / 2;
+
+    // Heart icon
+    ctx.fillStyle = "rgba(220, 50, 100, 0.85)";
+    ctx.font = `${heartFs}px system-ui`;
+    ctx.textAlign = "left";
+    ctx.fillText("\u2665", startX, topY - mainFs * 2.2);
+
+    // Question text
+    ctx.fillStyle = "rgba(180, 50, 90, 0.90)";
+    ctx.font = `700 ${mainFs}px system-ui`;
+    ctx.fillText(questionText, startX + heartW + 8, topY - mainFs * 2.2);
+
+    // Subtext
+    const subFs = Math.max(12, scaleUnit * 0.018);
+    ctx.font = `500 ${subFs}px system-ui`;
+    ctx.fillStyle = "rgba(140, 60, 90, 0.65)";
+    ctx.textAlign = "center";
+    ctx.fillText("No pressure. Except yes, pressure. Romantic pressure.", cx, topY - mainFs * 1.0);
+
     ctx.restore();
   }
 
@@ -1126,6 +1189,34 @@
         rW, rH, false);
     } else {
       drawEndingIdleSprite(fallbackWho);
+    }
+  }
+
+  function drawEndingKiss() {
+    const kW = spriteH * 1.1;
+    const kAR = audreyKissAnim ? (audreyKissAnim.frameH / audreyKissAnim.frameW) : 1;
+    const kH = kW * kAR;
+
+    // Audrey faces right (no flip)
+    if (audreyKissAnim && sprites.audreyKiss) {
+      const scale = kW / audreyKissAnim.frameW;
+      const xOff = audreyKissAnim._xOffsets ? audreyKissAnim._xOffsets[audreyKissAnim.frame] * scale : 0;
+      audreyKissAnim.draw(ctx,
+        audreyEndX + (spriteW - kW) * 0.5 + xOff,
+        audreyEndY - kH * 0.9,
+        kW, kH, false);
+    }
+
+    // Leah faces right in sprite, flip to face left
+    if (leahKissAnim && sprites.leahKiss) {
+      const lkW = kW * 0.9; // slightly smaller to match reaction scaling
+      const lkH = kH * 0.9;
+      const scale = lkW / leahKissAnim.frameW;
+      const xOff = leahKissAnim._xOffsets ? leahKissAnim._xOffsets[leahKissAnim.frame] * scale : 0;
+      leahKissAnim.draw(ctx,
+        leahEndX + (spriteW - lkW) * 0.5 - xOff,
+        leahEndY - lkH * 0.9,
+        lkW, lkH, true); // flipH = true
     }
   }
 
@@ -1704,6 +1795,22 @@
       audreyReactionAnim.sequence = [0, 2, 3];
       audreyReactionAnim._xOffsets = computeFrameXOffsets(sprites.audreyReaction, REACTION_COLS, REACTION_ROWS);
       audreyReactionAnim.preRenderFrames();
+    }
+
+    // Kiss animators (4 cols, 1 row each)
+    if (sprites.audreyKiss) {
+      audreyKissAnim = new SpriteAnimator(sprites.audreyKiss, KISS_COLS, KISS_ROWS, null);
+      audreyKissAnim.fps = 4;
+      audreyKissAnim.loop = false;
+      audreyKissAnim._xOffsets = computeFrameXOffsets(sprites.audreyKiss, KISS_COLS, KISS_ROWS);
+      audreyKissAnim.preRenderFrames();
+    }
+    if (sprites.leahKiss) {
+      leahKissAnim = new SpriteAnimator(sprites.leahKiss, KISS_COLS, KISS_ROWS, null);
+      leahKissAnim.fps = 4;
+      leahKissAnim.loop = false;
+      leahKissAnim._xOffsets = computeFrameXOffsets(sprites.leahKiss, KISS_COLS, KISS_ROWS);
+      leahKissAnim.preRenderFrames();
     }
 
     setState(State.START);

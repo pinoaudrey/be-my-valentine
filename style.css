@@ -31,6 +31,11 @@ html, body {
   display: flex;
 }
 
+.overlay.transparent {
+  background: none;
+  backdrop-filter: none;
+}
+
 /* ── Card (Valentine themed) ── */
 .card {
   width: min(520px, 92vw);
