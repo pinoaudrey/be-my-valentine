@@ -283,20 +283,77 @@
       }
     }
 
+    /** Pre-render each frame to its own canvas to eliminate bleed between frames. */
+    preRenderFrames() {
+      if (!this.img) return;
+      this._frameCvs = [];
+      // Use putImageData for pixel-perfect extraction (no interpolation at all)
+      const srcCvs = document.createElement("canvas");
+      srcCvs.width = this.img.width;
+      srcCvs.height = this.img.height;
+      const srcCtx = srcCvs.getContext("2d");
+      srcCtx.drawImage(this.img, 0, 0);
+
+      for (let r = 0; r < this.rows; r++) {
+        for (let c = 0; c < this.cols; c++) {
+          let sx, sy, sw, sh;
+          if (this.grid) {
+            const col = this.grid.cols[Math.min(c, this.grid.cols.length - 1)];
+            const row = this.grid.rows[Math.min(r, this.grid.rows.length - 1)];
+            sx = Math.round(col.x); sw = Math.round(col.w);
+            sy = Math.round(row.y); sh = Math.round(row.h);
+          } else {
+            // Trim right edge only — next character's content bleeds into this frame zone
+            sx = Math.round(c * this.frameW);
+            sy = Math.round(r * this.frameH);
+            sw = Math.round((c + 1) * this.frameW) - sx - 8;
+            sh = Math.round((r + 1) * this.frameH) - sy;
+          }
+          // Pixel-perfect copy via getImageData/putImageData — zero interpolation
+          const imageData = srcCtx.getImageData(sx, sy, sw, sh);
+          const fc = document.createElement("canvas");
+          fc.width = sw; fc.height = sh;
+          const fctx = fc.getContext("2d");
+          fctx.putImageData(imageData, 0, 0);
+          this._frameCvs.push({ cvs: fc, w: sw, h: sh });
+        }
+      }
+    }
+
     draw(ctx, x, y, dw, dh, flipH) {
       if (!this.img) return;
-      let sx, sy, sw, sh;
       const drawFrame = this.frame;
+
+      // If pre-rendered frames exist, draw from the clean individual canvas
+      if (this._frameCvs) {
+        const idx = this.row * this.cols + drawFrame;
+        const fc = this._frameCvs[Math.min(idx, this._frameCvs.length - 1)];
+        if (fc) {
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          if (flipH) {
+            ctx.translate(x + dw, y);
+            ctx.scale(-1, 1);
+            ctx.drawImage(fc.cvs, 0, 0, fc.w, fc.h, 0, 0, dw, dh);
+          } else {
+            ctx.drawImage(fc.cvs, 0, 0, fc.w, fc.h, x, y, dw, dh);
+          }
+          ctx.restore();
+          return;
+        }
+      }
+
+      let sx, sy, sw, sh;
       if (this.grid) {
         const col = this.grid.cols[Math.min(drawFrame, this.grid.cols.length - 1)];
         const row = this.grid.rows[Math.min(this.row,   this.grid.rows.length - 1)];
         sx = col.x; sw = col.w;
         sy = row.y; sh = row.h;
       } else {
-        sx = drawFrame * this.frameW;
-        sy = this.row * this.frameH;
-        sw = this.frameW;
-        sh = this.frameH;
+        sx = Math.round(drawFrame * this.frameW);
+        sy = Math.round(this.row * this.frameH);
+        sw = Math.round((drawFrame + 1) * this.frameW) - sx;
+        sh = Math.round((this.row + 1) * this.frameH) - sy;
       }
       ctx.save();
       ctx.imageSmoothingEnabled = false;
@@ -772,8 +829,18 @@
   function renderOverlayForState() {
     // States with no overlay
     if (state === State.LOADING || state === State.PLAYING ||
-        state === State.HEART_REACTING || state === State.ENDING_SCENE) {
+        state === State.HEART_REACTING) {
       hideOverlay();
+      return;
+    }
+
+    // Ending scene: only show overlay during phase 1 (Valentine question)
+    if (state === State.ENDING_SCENE) {
+      if (endingPhase === 1) {
+        showEndingQuestion();
+      } else {
+        hideOverlay();
+      }
       return;
     }
 
@@ -836,13 +903,26 @@
     }
 
     if (state === State.ENDING) {
+      const ap = getPortraitDataURL("audreyPortraits", 4);
+      const lp = getPortraitDataURL("leahPortraits",  1);
       showOverlay(`
-        <div class="card">
-          <div class="h1">Leah, will you be my Valentine? <span class="heart-icon">\u2665</span></div>
-          <p class="p">No pressure. Except yes, pressure. Romantic pressure.</p>
-          <div class="row">
-            <button class="btn" data-action="yes">Yes</button>
-            <button class="btn secondary" data-action="yesAlso">Absolutely yes</button>
+        <div class="card dialogue-card">
+          <div class="h1">Correct answer <span class="heart-icon">\u2665</span></div>
+          <div class="dialogue-body" style="margin-bottom:14px">
+            <div class="portrait-slot">
+              ${ap ? `<img class="portrait" src="${ap}" alt="Audrey">` : ""}
+            </div>
+            <div class="dialogue-text">
+              <div class="dialogue-speaker">Audrey</div>
+              <p class="dialogue-reason" data-typewriter>Happy Valentine\u2019s Day, ${HER_NAME}. I am taking you on a proper date.</p>
+              <p class="p small" style="margin-top:8px">Now screenshot this and hold it over my head forever.</p>
+            </div>
+            <div class="portrait-slot">
+              ${lp ? `<img class="portrait" src="${lp}" alt="${HER_NAME}">` : ""}
+            </div>
+          </div>
+          <div class="row" style="justify-content:center">
+            <button class="btn" data-action="restart">Play again</button>
           </div>
         </div>
       `);
@@ -896,31 +976,14 @@
       return;
     }
 
-    if (action === "yes" || action === "yesAlso") {
-      popConfettiBurst(w * 0.5, h * 0.45, 120);
-      const ap = getPortraitDataURL("audreyPortraits", 4);
-      const lp = getPortraitDataURL("leahPortraits",  1);
-      showOverlay(`
-        <div class="card dialogue-card">
-          <div class="h1">Correct answer <span class="heart-icon">\u2665</span></div>
-          <div class="dialogue-body" style="margin-bottom:14px">
-            <div class="portrait-slot">
-              ${ap ? `<img class="portrait" src="${ap}" alt="Audrey">` : ""}
-            </div>
-            <div class="dialogue-text">
-              <div class="dialogue-speaker">Audrey</div>
-              <p class="dialogue-reason" data-typewriter>Happy Valentine\u2019s Day, ${HER_NAME}. I am taking you on a proper date.</p>
-              <p class="p small" style="margin-top:8px">Now screenshot this and hold it over my head forever.</p>
-            </div>
-            <div class="portrait-slot">
-              ${lp ? `<img class="portrait" src="${lp}" alt="Leah">` : ""}
-            </div>
-          </div>
-          <div class="row" style="justify-content:center">
-            <button class="btn" data-action="restart">Play again</button>
-          </div>
-        </div>
-      `);
+    if (action === "endingYes") {
+      // Hide the question overlay and trigger heart reaction animations
+      hideOverlay();
+      endingAnswered = true;
+      endingPhase = 2;
+      endingTimer = 0;
+      if (leahReactionAnim)   { leahReactionAnim.loop = true;  leahReactionAnim.reset(true); }
+      if (audreyReactionAnim) { audreyReactionAnim.loop = true; audreyReactionAnim.reset(true); }
       return;
     }
 
@@ -948,6 +1011,7 @@
     playerMoving = false;
     endingTimer = 0;
     endingPhase = 0;
+    endingAnswered = false;
   }
 
   /* ═══════════════════════════════════════════
@@ -991,6 +1055,8 @@
     setState(State.ENDING_SCENE);
   }
 
+  let endingAnswered = false; // set true when user clicks yes/absolutely yes
+
   function updateEndingScene(dt) {
     endingTimer += dt;
     const cx  = w * 0.5;
@@ -1009,25 +1075,42 @@
       if (t >= 1) {
         endingPhase = 1;
         endingTimer = 0;
-        if (leahReactionAnim)   leahReactionAnim.reset(true);
-        if (audreyReactionAnim) audreyReactionAnim.reset(true);
+        endingAnswered = false;
+        // Show the Valentine question as an in-game overlay
+        showEndingQuestion();
       }
     } else if (endingPhase === 1) {
-      // Play heart reactions
+      // Idle — waiting for the player to click yes/absolutely yes
+      // (handled by showEndingQuestion buttons)
+    } else if (endingPhase === 2) {
+      // Play heart reactions (replacing walk sprites entirely)
       if (leahReactionAnim)   leahReactionAnim.update(dt);
       if (audreyReactionAnim) audreyReactionAnim.update(dt);
 
       if (endingTimer >= ENDING_REACT_DUR) {
-        endingPhase = 2;
+        endingPhase = 3;
         endingTimer = 0;
         popConfettiBurst(cx, h * 0.35, 100);
       }
-    } else if (endingPhase === 2) {
+    } else if (endingPhase === 3) {
       // Confetti pause, then show final card
       if (endingTimer >= 0.6) {
         setState(State.ENDING);
       }
     }
+  }
+
+  function showEndingQuestion() {
+    showOverlay(`
+      <div class="card">
+        <div class="h1">${HER_NAME}, will you be my Valentine? <span class="heart-icon">\u2665</span></div>
+        <p class="p">No pressure. Except yes, pressure. Romantic pressure.</p>
+        <div class="row" style="justify-content:center">
+          <button class="btn" data-action="endingYes">Yes</button>
+          <button class="btn secondary" data-action="endingYes">Absolutely yes</button>
+        </div>
+      </div>
+    `);
   }
 
   function drawEndingScene() {
@@ -1039,47 +1122,50 @@
       if (leahWalkAnim && sprites.leahWalk) {
         leahWalkAnim.draw(ctx, leahEndX, leahEndY - spriteH, spriteW, spriteH, true);
       }
+    } else if (endingPhase === 1) {
+      // Phase 1: Idle front-facing sprites while Valentine question is shown
+      drawEndingIdleSprites();
     } else {
-      // Phase 1+: Show idle walk sprites with reaction sprites above
-      // Draw idle walk sprites (front-facing, frame 0 row 0)
-      if (sprites.audreyWalk) {
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const fw = sprites.audreyWalk.width / WALK_COLS;
-        const fh = sprites.audreyWalk.height / WALK_ROWS;
-        ctx.drawImage(sprites.audreyWalk, 0, 0, fw, fh,
-          audreyEndX, audreyEndY - spriteH, spriteW, spriteH);
-        ctx.restore();
-      }
-      if (sprites.leahWalk) {
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const fw = sprites.leahWalk.width / WALK_COLS;
-        const fh = sprites.leahWalk.height / WALK_ROWS;
-        ctx.drawImage(sprites.leahWalk, 0, 0, fw, fh,
-          leahEndX, leahEndY - spriteH, spriteW, spriteH);
-        ctx.restore();
-      }
+      // Phase 2+: Heart reaction sprites REPLACE the walk sprites entirely
+      const rW = spriteH * 1.1;
+      const frameAR = leahReactionAnim ? (leahReactionAnim.frameH / leahReactionAnim.frameW) : 1;
+      const rH = rW * frameAR;
 
-      // Draw reaction animations above the walk sprites
-      if (endingPhase >= 1) {
-        const rH = spriteH * 1.6;
-        const rAR = getFrameAspect(leahReactionAnim);
-        const rW = rH * rAR;
+      // Audrey at full size, Leah scaled down slightly to match
+      drawEndingReaction(audreyReactionAnim, sprites.audreyReaction, audreyEndX, audreyEndY, rW, rH, "audrey");
+      drawEndingReaction(leahReactionAnim, sprites.leahReaction, leahEndX, leahEndY, rW * 0.9, rH * 0.9, "leah");
+    }
+  }
 
-        if (audreyReactionAnim && sprites.audreyReaction) {
-          audreyReactionAnim.draw(ctx,
-            audreyEndX + (spriteW - rW) * 0.5,
-            audreyEndY - spriteH - rH * 0.55,
-            rW, rH, false);
-        }
-        if (leahReactionAnim && sprites.leahReaction) {
-          leahReactionAnim.draw(ctx,
-            leahEndX + (spriteW - rW) * 0.5,
-            leahEndY - spriteH - rH * 0.55,
-            rW, rH, false);
-        }
-      }
+  function drawEndingIdleSprites() {
+    drawEndingIdleSprite("audrey");
+    drawEndingIdleSprite("leah");
+  }
+
+  function drawEndingIdleSprite(who) {
+    const isAudrey = who === "audrey";
+    const img = isAudrey ? sprites.audreyWalk : sprites.leahWalk;
+    const ex = isAudrey ? audreyEndX : leahEndX;
+    const ey = isAudrey ? audreyEndY : leahEndY;
+    if (!img) return;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const fw = img.width / WALK_COLS;
+    const fh = img.height / WALK_ROWS;
+    ctx.drawImage(img, 0, 0, fw, fh, ex, ey - spriteH, spriteW, spriteH);
+    ctx.restore();
+  }
+
+  function drawEndingReaction(anim, img, ex, ey, rW, rH, fallbackWho) {
+    if (anim && img) {
+      const scale = rW / anim.frameW;
+      const xOff = anim._xOffsets ? anim._xOffsets[anim.frame] * scale : 0;
+      anim.draw(ctx,
+        ex + (spriteW - rW) * 0.5 + xOff,
+        ey - rH * 0.9,
+        rW, rH, false);
+    } else {
+      drawEndingIdleSprite(fallbackWho);
     }
   }
 
@@ -1343,8 +1429,8 @@
       drawPlayer(player.x, player.y);
     }
 
-    // Ending scene
-    if (state === State.ENDING_SCENE) {
+    // Ending scene (also draw during ENDING state so characters show behind final overlay)
+    if (state === State.ENDING_SCENE || state === State.ENDING) {
       drawEndingScene();
     }
 
@@ -1624,6 +1710,7 @@
       // Only use frames 0 (neutral), 2 (heart), 3 (big heart) — skip frame 1 (exclamation)
       leahReactionAnim.sequence = [0, 2, 3];
       leahReactionAnim._xOffsets = computeFrameXOffsets(sprites.leahReaction, REACTION_COLS, REACTION_ROWS);
+      leahReactionAnim.preRenderFrames();
     }
     if (sprites.audreyWalk) {
       const grid = detectSpriteGrid(sprites.audreyWalk);
@@ -1633,6 +1720,9 @@
       // Use uniform grid for reaction sprites (auto-detect misreads the decorations above heads)
       audreyReactionAnim = new SpriteAnimator(sprites.audreyReaction, REACTION_COLS, REACTION_ROWS, null);
       audreyReactionAnim.fps = 5;
+      audreyReactionAnim.sequence = [0, 2, 3];
+      audreyReactionAnim._xOffsets = computeFrameXOffsets(sprites.audreyReaction, REACTION_COLS, REACTION_ROWS);
+      audreyReactionAnim.preRenderFrames();
     }
 
     setState(State.START);
