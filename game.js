@@ -1068,7 +1068,7 @@
     // Only show floating buttons — question text is drawn on canvas
     overlay.classList.add("transparent");
     showOverlay(`
-      <div style="position:fixed;bottom:35%;left:0;right:0;display:flex;justify-content:center;gap:10px;">
+      <div style="position:fixed;bottom:33%;left:0;right:0;display:flex;justify-content:center;gap:10px;">
         <button class="btn" data-action="endingYes">Yes</button>
         <button class="btn secondary" data-action="endingYes">Absolutely yes</button>
       </div>
