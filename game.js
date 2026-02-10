@@ -420,7 +420,6 @@
 
   let collected = 0;
   let lastHeartSpawned = false;
-  let muted = false;
   const particles = [];
 
   /* ═══════════════════════════════════════════
@@ -496,11 +495,12 @@
       player.x = w * 0.5;
       player.y = h * 0.60;
     }
+    const topMargin = margin + spriteH * 1.2;
     player.x = clamp(player.x, margin, w - margin);
-    player.y = clamp(player.y, margin, h - margin);
+    player.y = clamp(player.y, topMargin, h - margin);
     if (heart.alive) {
       heart.x = clamp(heart.x, margin, w - margin);
-      heart.y = clamp(heart.y, margin, h - margin);
+      heart.y = clamp(heart.y, topMargin, h - margin);
     }
     if (state !== State.LOADING) renderOverlayForState();
     initMeadow();
@@ -643,13 +643,17 @@
 
   function spawnHeart() {
     const margin = safeMargin();
+    // Extra top margin so reaction animations don't get clipped at the top
+    const topMargin = margin + spriteH * 1.2;
     const minP = player.r * 5.2;
     const minH = heart.r * 4;
+    const joyExclude = joy.baseR * 2.2; // keep hearts away from joystick area
     let tries = 0, nx, ny;
     do {
       nx = rand(margin, w - margin);
-      ny = rand(margin, h - margin);
+      ny = rand(topMargin, h - margin);
       if (dist(nx, ny, player.x, player.y) > minP &&
+          dist(nx, ny, joy.cx, joy.cy) > joyExclude &&
           (!heart.alive || dist(nx, ny, heart.x, heart.y) > minH)) break;
       tries++;
     } while (tries < 80);
@@ -852,7 +856,6 @@
           <p class="p">Walk around, find them all, and read every reason — there's a surprise waiting at the end!</p>
           <div class="row">
             <button class="btn" data-action="start">Let's Go!</button>
-            <button class="btn secondary" data-action="how">How to play</button>
           </div>
           <p class="p small" style="margin-top:12px">Tip: use arrow keys, WASD, or the joystick to move.</p>
         </div>
@@ -873,7 +876,6 @@
               ${ap ? `<img class="portrait" src="${ap}" alt="Audrey">` : ""}
             </div>
             <div class="dialogue-text">
-              <div class="dialogue-speaker">Audrey</div>
               <p class="dialogue-reason" data-typewriter>\u201C${escapeHtml(reasonText)}\u201D</p>
             </div>
             <div class="portrait-slot">
@@ -939,18 +941,7 @@
   }
 
   function handleAction(action) {
-    if (action === "how") {
-      showOverlay(`
-        <div class="card">
-          <div class="h1">How to play</div>
-          <p class="p">Use arrow keys / WASD or the on-screen joystick to move. Collect the heart. Read the reason. Repeat.</p>
-          <div class="row">
-            <button class="btn" data-action="backToStart">Got it</button>
-          </div>
-        </div>
-      `);
-      return;
-    }
+
 
     if (action === "backToStart") { setState(State.START); return; }
     if (action === "start")       { startGame(); return; }
@@ -1262,17 +1253,6 @@
     if (state === State.PLAYING) e.preventDefault();
   }, { passive: false });
 
-  // Mute button
-  const corner = document.createElement("div");
-  corner.className = "corner";
-  corner.innerHTML = `<button class="iconBtn" id="muteBtn" aria-label="toggle sound">\uD83D\uDD07</button>`;
-  document.body.appendChild(corner);
-  const muteBtn = document.getElementById("muteBtn");
-  muteBtn.addEventListener("click", () => {
-    muted = !muted;
-    muteBtn.textContent = muted ? "\uD83D\uDD07" : "\uD83D\uDD0A";
-  });
-
   /* ═══════════════════════════════════════════
      GAME LOOP
      ═══════════════════════════════════════════ */
@@ -1333,8 +1313,9 @@
       playerMoving = true;
       const step = player.speed * dt;
       const margin = safeMargin();
+      const topMargin = margin + spriteH * 1.2;
       player.x = clamp(player.x + moveX * step, margin, w - margin);
-      player.y = clamp(player.y + moveY * step, margin, h - margin);
+      player.y = clamp(player.y + moveY * step, topMargin, h - margin);
 
       // Direction detection (favour horizontal for diagonals)
       if (Math.abs(moveY) > Math.abs(moveX) * 1.2) {
@@ -1549,18 +1530,43 @@
         state === State.ENDING  || state === State.ENDING_SCENE) return;
 
     const fs = Math.max(14, scaleUnit * 0.022);
-    ctx.globalAlpha = 0.9;
+    const heartFs = Math.round(fs * 1.3);
+    const label = `${collected} / ${reasons.length}`;
 
-    // Heart icon via text
+    // Measure text width to center the pill
+    ctx.font = `700 ${fs}px system-ui`;
+    const textW = ctx.measureText(label).width;
+    const pillW = heartFs + 8 + textW + 20; // icon + gap + text + padding
+    const pillH = Math.round(fs * 2);
+    const pillX = (w - pillW) / 2;
+    const pillY = 12;
+    const pillR = pillH / 2;
+
+    // Frosted pill background
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY, pillW, pillH, pillR);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(220, 100, 150, 0.35)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+
+    // Heart icon
+    ctx.globalAlpha = 0.95;
     ctx.fillStyle = "rgba(220, 50, 100, 0.90)";
-    ctx.font = `${Math.round(fs * 1.1)}px system-ui`;
-    ctx.fillText("\u2665", 14, 28);
+    ctx.font = `${heartFs}px system-ui`;
+    ctx.textAlign = "left";
+    ctx.fillText("\u2665", pillX + 10, pillY + pillH * 0.72);
 
-    // Count
-    ctx.fillStyle = "rgba(40, 30, 60, 0.90)";
-    ctx.font = `600 ${fs}px system-ui`;
-    ctx.fillText(`${collected} / ${reasons.length}`, 14 + Math.round(fs * 0.95), 28);
+    // Count text
+    ctx.fillStyle = "rgba(80, 40, 60, 0.90)";
+    ctx.font = `700 ${fs}px system-ui`;
+    ctx.fillText(label, pillX + 10 + heartFs + 4, pillY + pillH * 0.66);
     ctx.globalAlpha = 1;
+    ctx.textAlign = "start";
 
     // Virtual joystick
     if (state === State.PLAYING) {
@@ -1570,22 +1576,22 @@
 
   function drawJoystick() {
     // Base circle
-    ctx.globalAlpha = joy.active ? 0.35 : 0.18;
+    ctx.globalAlpha = joy.active ? 0.55 : 0.35;
     ctx.beginPath();
     ctx.arc(joy.cx, joy.cy, joy.baseR, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255, 180, 200, 0.25)";
+    ctx.fillStyle = "rgba(60, 30, 50, 0.25)";
     ctx.fill();
-    ctx.strokeStyle = "rgba(255, 180, 200, 0.5)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(60, 30, 50, 0.45)";
+    ctx.lineWidth = 2.5;
     ctx.stroke();
 
     // Knob
     const kx = joy.active ? joy.tx : joy.cx;
     const ky = joy.active ? joy.ty : joy.cy;
-    ctx.globalAlpha = joy.active ? 0.6 : 0.25;
+    ctx.globalAlpha = joy.active ? 0.75 : 0.45;
     ctx.beginPath();
     ctx.arc(kx, ky, joy.knobR, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255, 140, 180, 0.7)";
+    ctx.fillStyle = "rgba(180, 60, 100, 0.75)";
     ctx.fill();
     ctx.globalAlpha = 1;
   }
