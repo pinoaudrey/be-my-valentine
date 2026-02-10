@@ -73,6 +73,7 @@
 
     if (bgCache) {
       // Draw the meadow background scaled down then back up to simulate blur
+      ctx.save();
       const scale = 0.06; // smaller = blurrier
       const tmp = document.createElement("canvas");
       tmp.width = Math.max(1, Math.floor(w * scale));
@@ -82,6 +83,7 @@
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(tmp, 0, 0, w, h);
+      ctx.restore();
 
       // Frosted overlay matching the dialogue screens
       ctx.fillStyle = "rgba(180, 220, 200, 0.35)";
