@@ -12,7 +12,6 @@
     "I never get bored with you. Even our lazy do-nothing days are secretly the best days.",
     "You're so funny. You dish the sass right back, match my wit, and somehow always catch me off guard in the best way.",
     "You challenge the way I think, and I love that about you. It doesn't hurt that you can basically read my mind.",
-    "You let me be fully me- weird, unfiltered, all of it. And that honestly means more than anything.",
     "Cosima. That's it. That's the reason.",
     "It's the little everyday things with you that make me feel so chosen, I never have to wonder."
   ];
@@ -419,7 +418,6 @@
   const heart  = { x: 0, y: 0, r: 12, alive: false, bobT: 0 };
 
   let collected = 0;
-  let lastHeartSpawned = false;
   const particles = [];
 
   /* ═══════════════════════════════════════════
@@ -870,7 +868,7 @@
       const lp = getPortraitDataURL("leahPortraits",  emotions.leah);
       showOverlay(`
         <div class="card dialogue-card">
-          <div class="dialogue-header">Heart ${collected} of ${reasons.length}</div>
+          <div class="dialogue-header">Heart ${collected} of ${reasons.length + 1}</div>
           <div class="dialogue-body">
             <div class="portrait-slot">
               ${ap ? `<img class="portrait" src="${ap}" alt="Audrey">` : ""}
@@ -890,34 +888,20 @@
       return;
     }
 
-    if (state === State.FINAL_GATE) {
-      showOverlay(`
-        <div class="card">
-          <div class="h1">One last heart <span class="heart-icon">\u2665</span></div>
-          <p class="p">It is shy. It will not appear until you click a promise.</p>
-          <div class="row">
-            <button class="btn" data-action="promiseYes">I promise to say yes</button>
-            <button class="btn secondary" data-action="fineShow">Fine, show me</button>
-          </div>
-        </div>
-      `);
-      return;
-    }
 
     if (state === State.ENDING) {
       const ap = getPortraitDataURL("audreyPortraits", 4);
       const lp = getPortraitDataURL("leahPortraits",  1);
       showOverlay(`
         <div class="card dialogue-card">
-          <div class="h1">Correct answer <span class="heart-icon">\u2665</span></div>
+          <div class="h1">Happy Valentine's Day <span class="heart-icon">\u2665</span></div>
           <div class="dialogue-body" style="margin-bottom:14px">
             <div class="portrait-slot">
               ${ap ? `<img class="portrait" src="${ap}" alt="Audrey">` : ""}
             </div>
             <div class="dialogue-text">
-              <div class="dialogue-speaker">Audrey</div>
-              <p class="dialogue-reason" data-typewriter>Happy Valentine\u2019s Day, ${HER_NAME}. I am taking you on a proper date.</p>
-              <p class="p small" style="margin-top:8px">Now screenshot this and hold it over my head forever.</p>
+              <p class="dialogue-reason" data-typewriter>You are the best valentine I could ask for. I can't wait to celebrate together.</p>
+              <p class="p small" style="margin-top:6px">Screenshot this to redeem for 5 million kisses. Non-negotiable. No refunds.</p>
             </div>
             <div class="portrait-slot">
               ${lp ? `<img class="portrait" src="${lp}" alt="${HER_NAME}">` : ""}
@@ -947,21 +931,7 @@
     if (action === "start")       { startGame(); return; }
 
     if (action === "nextReason") {
-      if (collected === reasons.length - 1 && !lastHeartSpawned) {
-        setState(State.FINAL_GATE);
-        return;
-      }
-      if (collected >= reasons.length) {
-        startEndingScene();
-        return;
-      }
-      setState(State.PLAYING);
-      spawnHeart();
-      return;
-    }
-
-    if (action === "promiseYes" || action === "fineShow") {
-      lastHeartSpawned = true;
+      // After all reasons shown, spawn the 7th (final) heart
       setState(State.PLAYING);
       spawnHeart();
       return;
@@ -993,7 +963,6 @@
 
   function resetGame() {
     collected = 0;
-    lastHeartSpawned = false;
     heart.alive = false;
     particles.length = 0;
     player.x  = w * 0.5;
@@ -1284,7 +1253,12 @@
       heartReactTimer += dt;
       if (leahReactionAnim) leahReactionAnim.update(dt);
       if (heartReactTimer >= HEART_REACT_DUR) {
-        setState(State.SHOWING_REASON);
+        // 7th heart (beyond reasons) triggers ending scene directly
+        if (collected > reasons.length) {
+          startEndingScene();
+        } else {
+          setState(State.SHOWING_REASON);
+        }
       }
       return;
     }
@@ -1531,7 +1505,8 @@
 
     const fs = Math.max(14, scaleUnit * 0.022);
     const heartFs = Math.round(fs * 1.3);
-    const label = `${collected} / ${reasons.length}`;
+    const totalHearts = reasons.length + 1; // 6 reasons + 1 final
+    const label = `${collected} / ${totalHearts}`;
 
     // Measure text width to center the pill
     ctx.font = `700 ${fs}px system-ui`;
