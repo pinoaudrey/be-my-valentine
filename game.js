@@ -14,7 +14,7 @@
     "You challenge the way I think, and I love that about you. It doesn't hurt that you can basically read my mind.",
     "Cosima. That's it. That's the reason.",
     "It's the little everyday things with you that make me feel so chosen, I never have to wonder.",
-    "You're the coolest ever."
+    "You're the coolest ever, I am so lucky"
   ];
 
   // Portrait emotion indices per reason
