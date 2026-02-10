@@ -9,7 +9,7 @@
   // 7 reasons
   const reasons = [
     "You're so thoughtful. The flowers, the dark chocolate pretzel yum yums, the Murdle book...you notice the little things nobody else does.",
-    "I never get bored with you. Even our lazy do-nothing days are secretly the best days.",
+    "I never get bored with you. Our lazy bed rot days are (not so) secretly the best days.",
     "You're so funny. You dish the sass right back, match my wit, and somehow always catch me off guard in the best way.",
     "You challenge the way I think, and I love that about you. It doesn't hurt that you can basically read my mind.",
     "Cosima. That's it. That's the reason.",
@@ -683,37 +683,21 @@
     });
   }
 
-  let typewriterRAF = null;
+  let typewriterTimer = null;
   function typewrite(el) {
-    if (typewriterRAF) { cancelAnimationFrame(typewriterRAF); typewriterRAF = null; }
+    if (typewriterTimer) { clearTimeout(typewriterTimer); typewriterTimer = null; }
     const text = el.textContent;
-    // Wrap each character in a span, start invisible
-    el.innerHTML = "";
-    const spans = [];
-    for (let i = 0; i < text.length; i++) {
-      const span = document.createElement("span");
-      span.textContent = text[i];
-      span.style.opacity = "0";
-      el.appendChild(span);
-      spans.push(span);
-    }
-    const charsPerSec = 50;
-    const startT = performance.now();
-    let revealed = 0;
-    function tick(t) {
-      const elapsed = (t - startT) / 1000;
-      const target = Math.min(Math.floor(elapsed * charsPerSec), spans.length);
-      while (revealed < target) {
-        spans[revealed].style.opacity = "1";
-        revealed++;
-      }
-      if (revealed < spans.length) {
-        typewriterRAF = requestAnimationFrame(tick);
+    el.textContent = "";
+    let i = 0;
+    function step() {
+      if (i < text.length) {
+        el.textContent += text[i++];
+        typewriterTimer = setTimeout(step, 18);
       } else {
-        typewriterRAF = null;
+        typewriterTimer = null;
       }
     }
-    typewriterRAF = requestAnimationFrame(tick);
+    step();
   }
 
   function hideOverlay() {
@@ -937,8 +921,8 @@
     if (action === "start")       { startGame(); return; }
 
     if (action === "nextReason") {
-      // DEBUG: skip straight to ending scene after first heart
-      startEndingScene();
+      setState(State.PLAYING);
+      spawnHeart();
       return;
     }
 
