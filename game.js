@@ -8,13 +8,13 @@
 
   // 7 reasons
   const reasons = [
-    "You're so thoughtful. The flowers, the pretzel delights you always make me, the Murdle book. It's like you're always thinking about me, even when I don't ask.",
+    "You're so thoughtful. The flowers, the dark chocolate pretzel yum yums, the Murdle book...you notice the little things nobody else does.",
     "I never get bored with you. Even our lazy do-nothing days are secretly the best days.",
     "You're so funny. You dish the sass right back, match my wit, and somehow always catch me off guard in the best way.",
-    "Talking to you makes my brain work harder in the best way. And somehow you still finish my sentences.",
-    "You let me be fully me \u2014 weird, unfiltered, all of it. And that honestly means more than anything.",
-    "Cosima. That\u2019s it. That\u2019s the reason.",
-    "It\u2019s the little everyday things with you that make me feel so chosen, I never have to wonder."
+    "You challenge the way I think, and I love that about you. It doesn't hurt that you can basically read my mind.",
+    "You let me be fully me- weird, unfiltered, all of it. And that honestly means more than anything.",
+    "Cosima. That's it. That's the reason.",
+    "It's the little everyday things with you that make me feel so chosen, I never have to wonder."
   ];
 
   // Portrait emotion indices per reason
