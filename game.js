@@ -158,6 +158,44 @@
     return { cols, rows };
   }
 
+  /**
+   * Compute per-frame horizontal content center (as fraction 0-1 within each cell)
+   * for a uniform-grid spritesheet. Returns an array of x-offsets (pixels) that
+   * should be added when drawing each frame to keep the content visually centred.
+   */
+  function computeFrameXOffsets(img, cols, rows) {
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    const cx = c.getContext("2d");
+    cx.drawImage(img, 0, 0);
+    const data = cx.getImageData(0, 0, c.width, c.height).data;
+    const fw = img.width / cols;
+    const fh = img.height / rows;
+
+    // For row 0 only (reaction sprites are 1 row)
+    const centers = [];
+    for (let f = 0; f < cols; f++) {
+      let sumX = 0, count = 0;
+      const x0 = Math.round(f * fw);
+      const x1 = Math.round((f + 1) * fw);
+      for (let y = 0; y < fh; y++) {
+        for (let x = x0; x < x1; x++) {
+          const i = (y * c.width + x) * 4;
+          if (data[i + 3] > 30) { // has content
+            sumX += (x - x0);
+            count++;
+          }
+        }
+      }
+      centers.push(count > 0 ? sumX / count : fw * 0.5);
+    }
+
+    // Average center across all frames
+    const avg = centers.reduce((a, b) => a + b, 0) / centers.length;
+    // Offset = how much to shift each frame so its center aligns with the average
+    return centers.map(cx => avg - cx);
+  }
+
   /* ═══════════════════════════════════════════
      SPRITE ANIMATOR
      Supports both uniform grids and auto-detected grids.
@@ -189,6 +227,8 @@
       this.playing = true;
       this.loop = true;
       this.startFrame = 0;
+      this.sequence = null;  // optional custom frame sequence, e.g. [0, 2, 3]
+      this._seqIdx = 0;      // current index into the sequence
       this.onFinish = null;
     }
 
@@ -198,14 +238,28 @@
       const dur = 1 / this.fps;
       while (this.elapsed >= dur) {
         this.elapsed -= dur;
-        this.frame++;
-        if (this.frame >= this.cols) {
-          if (this.loop) {
-            this.frame = this.startFrame;
-          } else {
-            this.frame = this.cols - 1;
-            this.playing = false;
-            if (this.onFinish) this.onFinish();
+        if (this.sequence) {
+          this._seqIdx++;
+          if (this._seqIdx >= this.sequence.length) {
+            if (this.loop) {
+              this._seqIdx = 0;
+            } else {
+              this._seqIdx = this.sequence.length - 1;
+              this.playing = false;
+              if (this.onFinish) this.onFinish();
+            }
+          }
+          this.frame = this.sequence[this._seqIdx];
+        } else {
+          this.frame++;
+          if (this.frame >= this.cols) {
+            if (this.loop) {
+              this.frame = this.startFrame;
+            } else {
+              this.frame = this.cols - 1;
+              this.playing = false;
+              if (this.onFinish) this.onFinish();
+            }
           }
         }
       }
@@ -214,13 +268,14 @@
     draw(ctx, x, y, dw, dh, flipH) {
       if (!this.img) return;
       let sx, sy, sw, sh;
+      const drawFrame = this.frame;
       if (this.grid) {
-        const col = this.grid.cols[Math.min(this.frame, this.grid.cols.length - 1)];
+        const col = this.grid.cols[Math.min(drawFrame, this.grid.cols.length - 1)];
         const row = this.grid.rows[Math.min(this.row,   this.grid.rows.length - 1)];
         sx = col.x; sw = col.w;
         sy = row.y; sh = row.h;
       } else {
-        sx = this.frame * this.frameW;
+        sx = drawFrame * this.frameW;
         sy = this.row * this.frameH;
         sw = this.frameW;
         sh = this.frameH;
@@ -247,7 +302,8 @@
 
     reset(play) {
       if (play === undefined) play = true;
-      this.frame = this.startFrame;
+      this._seqIdx = 0;
+      this.frame = this.sequence ? this.sequence[0] : this.startFrame;
       this.elapsed = 0;
       this.playing = play;
     }
@@ -313,7 +369,7 @@
 
   // Heart reaction overlay on canvas
   let heartReactTimer = 0;
-  const HEART_REACT_DUR = 0.45;
+  const HEART_REACT_DUR = 0.7;
   let heartReactX = 0, heartReactY = 0;
 
   // Ending scene
@@ -361,7 +417,7 @@
     player.r = Math.max(10, scaleUnit * 0.03);
     heart.r  = Math.max(10, scaleUnit * 0.028);
     // Speed tuned so walk animation stride matches movement distance
-    player.speed = Math.max(120, scaleUnit * 0.34);
+    player.speed = Math.max(120, scaleUnit * 0.36);
 
     // Virtual joystick sizing (bottom-left corner)
     joy.baseR = Math.max(36, scaleUnit * 0.07);
@@ -1075,7 +1131,8 @@
         if (leahReactionAnim) {
           leahReactionAnim.loop = false;
           leahReactionAnim.startFrame = 0;
-          leahReactionAnim.fps = REACTION_COLS / HEART_REACT_DUR;
+          // 3 frames in the sequence over the reaction duration
+          leahReactionAnim.fps = leahReactionAnim.sequence.length / HEART_REACT_DUR;
           leahReactionAnim.reset();
         }
         setState(State.HEART_REACTING);
@@ -1097,12 +1154,23 @@
       drawHeart(heart.x, heart.y + bobOff, heart.r);
     }
 
-    // Player
-    if (state === State.PLAYING || state === State.HEART_REACTING) {
+    // Player or heart reaction (reaction replaces the walk sprite)
+    if (state === State.HEART_REACTING) {
+      if (leahReactionAnim && sprites.leahReaction) {
+        // Size the reaction so the character portion matches the walk sprite scale
+        const rW = spriteH * 1.1;
+        const rH = rW * (leahReactionAnim.frameH / leahReactionAnim.frameW);
+        // Apply per-frame x-offset to keep character centred across frames
+        const scale = rW / leahReactionAnim.frameW;
+        const xOff = leahReactionAnim._xOffsets ? leahReactionAnim._xOffsets[leahReactionAnim.frame] * scale : 0;
+        leahReactionAnim.draw(ctx,
+          heartReactX - rW * 0.5 + xOff,
+          heartReactY - rH * 0.8,
+          rW, rH, false);
+      }
+    } else if (state === State.PLAYING) {
       drawPlayer(player.x, player.y);
     }
-
-    // (Heart reaction sprite removed — confetti burst is the visual cue instead)
 
     // Ending scene
     if (state === State.ENDING_SCENE) {
@@ -1295,17 +1363,20 @@
       leahWalkAnim = new SpriteAnimator(sprites.leahWalk, WALK_COLS, WALK_ROWS, grid);
     }
     if (sprites.leahReaction) {
-      const grid = detectSpriteGrid(sprites.leahReaction);
-      leahReactionAnim = new SpriteAnimator(sprites.leahReaction, REACTION_COLS, REACTION_ROWS, grid);
+      // Use uniform grid for reaction sprites (auto-detect misreads the decorations above heads)
+      leahReactionAnim = new SpriteAnimator(sprites.leahReaction, REACTION_COLS, REACTION_ROWS, null);
       leahReactionAnim.fps = 5;
+      // Only use frames 0 (neutral), 2 (heart), 3 (big heart) — skip frame 1 (exclamation)
+      leahReactionAnim.sequence = [0, 2, 3];
+      leahReactionAnim._xOffsets = computeFrameXOffsets(sprites.leahReaction, REACTION_COLS, REACTION_ROWS);
     }
     if (sprites.audreyWalk) {
       const grid = detectSpriteGrid(sprites.audreyWalk);
       audreyWalkAnim = new SpriteAnimator(sprites.audreyWalk, WALK_COLS, WALK_ROWS, grid);
     }
     if (sprites.audreyReaction) {
-      const grid = detectSpriteGrid(sprites.audreyReaction);
-      audreyReactionAnim = new SpriteAnimator(sprites.audreyReaction, REACTION_COLS, REACTION_ROWS, grid);
+      // Use uniform grid for reaction sprites (auto-detect misreads the decorations above heads)
+      audreyReactionAnim = new SpriteAnimator(sprites.audreyReaction, REACTION_COLS, REACTION_ROWS, null);
       audreyReactionAnim.fps = 5;
     }
 
