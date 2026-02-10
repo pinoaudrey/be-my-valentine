@@ -3,7 +3,7 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: #1a0f18;
+  background: #bfe8ff;
   touch-action: none;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
 }
@@ -22,8 +22,8 @@ html, body {
   align-items: center;
   justify-content: center;
   padding: 18px;
-  background: rgba(10, 6, 12, 0.6);
-  backdrop-filter: blur(8px);
+  background: rgba(180, 220, 200, 0.35);
+  backdrop-filter: blur(10px);
   z-index: 10;
 }
 
@@ -36,12 +36,12 @@ html, body {
   width: min(520px, 92vw);
   border-radius: 20px;
   padding: 22px;
-  background: rgba(255, 120, 170, 0.08);
-  border: 1px solid rgba(255, 120, 170, 0.18);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 180, 200, 0.35);
   box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 180, 210, 0.08);
-  color: rgba(255, 255, 255, 0.92);
+    0 10px 40px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  color: rgba(50, 30, 40, 0.92);
 }
 
 .h1 {
@@ -57,12 +57,12 @@ html, body {
 .p {
   margin: 0 0 14px 0;
   line-height: 1.4;
-  color: rgba(255, 220, 230, 0.86);
+  color: rgba(80, 50, 65, 0.82);
 }
 
 .small {
   font-size: 13px;
-  color: rgba(255, 200, 215, 0.60);
+  color: rgba(120, 80, 100, 0.60);
 }
 
 .row {
@@ -88,9 +88,9 @@ html, body {
 }
 
 .btn.secondary {
-  background: rgba(255, 120, 170, 0.14);
-  color: rgba(255, 210, 225, 0.90);
-  border: 1px solid rgba(255, 120, 170, 0.22);
+  background: rgba(255, 120, 170, 0.12);
+  color: rgba(180, 60, 100, 0.85);
+  border: 1px solid rgba(255, 120, 170, 0.30);
   box-shadow: none;
 }
 
@@ -107,7 +107,7 @@ html, body {
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: rgba(255, 160, 190, 0.55);
+  color: rgba(180, 80, 120, 0.60);
   margin-bottom: 14px;
   text-align: center;
 }
@@ -137,7 +137,7 @@ html, body {
 
 .portrait-name {
   font-size: 10px;
-  color: rgba(255, 180, 200, 0.50);
+  color: rgba(150, 70, 100, 0.55);
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 600;
@@ -147,7 +147,7 @@ html, body {
   flex: 1;
   min-width: 0;
   position: relative;
-  background: rgba(255, 120, 170, 0.08);
+  background: rgba(255, 255, 255, 0.45);
   border-radius: 14px;
   padding: 14px 16px;
 }
@@ -160,7 +160,7 @@ html, body {
   top: 50%;
   transform: translateY(-50%);
   border: 8px solid transparent;
-  border-right-color: rgba(255, 120, 170, 0.08);
+  border-right-color: rgba(255, 255, 255, 0.45);
   border-left: 0;
 }
 
@@ -169,17 +169,18 @@ html, body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: rgba(255, 170, 200, 0.65);
+  color: rgba(200, 80, 130, 0.70);
   margin-bottom: 6px;
 }
 
 .dialogue-reason {
   font-size: 16px;
   line-height: 1.55;
-  color: rgba(255, 245, 248, 0.92);
+  color: rgba(60, 35, 45, 0.88);
   font-style: italic;
   margin: 0;
 }
+
 
 /* ── Corner buttons ── */
 .corner {
@@ -195,9 +196,9 @@ html, body {
   width: 44px;
   height: 44px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 120, 170, 0.18);
-  background: rgba(255, 120, 170, 0.08);
-  color: rgba(255, 255, 255, 0.90);
+  border: 1px solid rgba(255, 120, 170, 0.25);
+  background: rgba(255, 255, 255, 0.45);
+  color: rgba(180, 60, 100, 0.85);
   font-size: 18px;
   cursor: pointer;
 }

@@ -9,7 +9,7 @@
   // 7 reasons
   const reasons = [
     "You're so thoughtful. The flowers, the pretzel delights you always make me, the Murdle book. It's like you're always thinking about me, even when I don't ask.",
-    "Everything is more fun with you. Packing, bad TV, long walks, doing absolutely nothing. Somehow you turn all of it into my favorite part of the day.",
+    "Everything is more fun with you. Watching TV, playing games, arts and crafts, even doing absolutely nothing somehow ends up being my favorite part of the day.",
     "You're so funny. You dish the sass right back, match my wit, and somehow always catch me off guard in the best way.",
     "You inspire me. You make me want to learn more, think deeper, and actually challenge my brain. And half the time, you know what I'm thinking before I even do.",
     "With you, I get to be fully myself. No pretending, no shrinking, no feeling judged. Just me, exactly as I am, and that feels really rare.",
@@ -70,16 +70,32 @@
 
   function drawLoadingScreen(progress) {
     ctx.clearRect(0, 0, w, h);
-    const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, "#1a0f18");
-    g.addColorStop(1, "#1a1030");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
+
+    if (bgCache) {
+      // Draw the meadow background scaled down then back up to simulate blur
+      const scale = 0.06; // smaller = blurrier
+      const tmp = document.createElement("canvas");
+      tmp.width = Math.max(1, Math.floor(w * scale));
+      tmp.height = Math.max(1, Math.floor(h * scale));
+      const tc = tmp.getContext("2d");
+      tc.drawImage(bgCache, 0, 0, tmp.width, tmp.height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(tmp, 0, 0, w, h);
+
+      // Frosted overlay matching the dialogue screens
+      ctx.fillStyle = "rgba(180, 220, 200, 0.35)";
+      ctx.fillRect(0, 0, w, h);
+    } else {
+      // Fallback if bgCache isn't ready yet
+      ctx.fillStyle = "#daf0ff";
+      ctx.fillRect(0, 0, w, h);
+    }
 
     const fontSize = Math.max(16, scaleUnit * 0.025);
     ctx.font = `600 ${fontSize}px system-ui`;
     ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(255, 120, 170, 0.9)";
+    ctx.fillStyle = "rgba(140, 60, 95, 0.80)";
     ctx.fillText(`Loading\u2026 ${Math.round(progress * 100)}%`, w / 2, h / 2 - 20);
 
     // Progress bar
@@ -87,9 +103,9 @@
     const barH = 6;
     const barX = (w - barW) / 2;
     const barY = h / 2 + 10;
-    ctx.fillStyle = "rgba(255, 120, 170, 0.15)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
     ctx.fillRect(barX, barY, barW, barH);
-    ctx.fillStyle = "rgba(255, 120, 170, 0.8)";
+    ctx.fillStyle = "rgba(210, 100, 150, 0.70)";
     ctx.fillRect(barX, barY, barW * progress, barH);
     ctx.textAlign = "start";
   }
@@ -595,6 +611,43 @@
     overlay.innerHTML = html;
     overlay.classList.add("show");
     wireOverlayButtons();
+    // Start typewriter effect on any element with data-typewriter
+    overlay.querySelectorAll("[data-typewriter]").forEach(el => {
+      typewrite(el);
+    });
+  }
+
+  let typewriterRAF = null;
+  function typewrite(el) {
+    if (typewriterRAF) { cancelAnimationFrame(typewriterRAF); typewriterRAF = null; }
+    const text = el.textContent;
+    // Wrap each character in a span, start invisible
+    el.innerHTML = "";
+    const spans = [];
+    for (let i = 0; i < text.length; i++) {
+      const span = document.createElement("span");
+      span.textContent = text[i];
+      span.style.opacity = "0";
+      el.appendChild(span);
+      spans.push(span);
+    }
+    const charsPerSec = 50;
+    const startT = performance.now();
+    let revealed = 0;
+    function tick(t) {
+      const elapsed = (t - startT) / 1000;
+      const target = Math.min(Math.floor(elapsed * charsPerSec), spans.length);
+      while (revealed < target) {
+        spans[revealed].style.opacity = "1";
+        revealed++;
+      }
+      if (revealed < spans.length) {
+        typewriterRAF = requestAnimationFrame(tick);
+      } else {
+        typewriterRAF = null;
+      }
+    }
+    typewriterRAF = requestAnimationFrame(tick);
   }
 
   function hideOverlay() {
@@ -726,9 +779,10 @@
       showOverlay(`
         <div class="card">
           <div class="h1">Hey ${HER_NAME} <span class="heart-icon">\u2665</span></div>
-          <p class="p">Collect all 7 hearts. Each one has a reason.</p>
+          <p class="p">I made this little game just for you. There are <strong>7 hearts</strong> hidden across the meadow, and each one holds a special reason why you mean so much to me.</p>
+          <p class="p">Walk around, find them all, and read every reason — there's a surprise waiting at the end!</p>
           <div class="row">
-            <button class="btn" data-action="start">Play</button>
+            <button class="btn" data-action="start">Let's Go!</button>
             <button class="btn secondary" data-action="how">How to play</button>
           </div>
           <p class="p small" style="margin-top:12px">Tip: use arrow keys, WASD, or the joystick to move.</p>
@@ -750,7 +804,8 @@
               ${ap ? `<img class="portrait" src="${ap}" alt="Audrey">` : ""}
             </div>
             <div class="dialogue-text">
-              <p class="dialogue-reason">\u201C${escapeHtml(reasonText)}\u201D</p>
+              <div class="dialogue-speaker">Audrey</div>
+              <p class="dialogue-reason" data-typewriter>\u201C${escapeHtml(reasonText)}\u201D</p>
             </div>
             <div class="portrait-slot">
               ${lp ? `<img class="portrait" src="${lp}" alt="Leah">` : ""}
@@ -852,7 +907,7 @@
             </div>
             <div class="dialogue-text">
               <div class="dialogue-speaker">Audrey</div>
-              <p class="dialogue-reason">Happy Valentine\u2019s Day, ${HER_NAME}. I am taking you on a proper date.</p>
+              <p class="dialogue-reason" data-typewriter>Happy Valentine\u2019s Day, ${HER_NAME}. I am taking you on a proper date.</p>
               <p class="p small" style="margin-top:8px">Now screenshot this and hold it over my head forever.</p>
             </div>
             <div class="portrait-slot">
