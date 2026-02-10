@@ -8,13 +8,13 @@
 
   // 7 reasons
   const reasons = [
-    "You make ordinary days feel like something I want to replay.",
-    "Your laugh is basically my favorite sound effect.",
-    "You are the person I want to tell everything to first.",
-    "You somehow make errands feel like dates, which is suspiciously powerful.",
-    "Inside joke placeholder, the one that makes you do the exact face you do.",
-    "You are sweet, sharp, and you keep me honest in the best way.",
-    "I like my life more with you in it, every single day."
+    "You're so thoughtful. The flowers, the pretzel delights you always make me, the Murdle book. It's like you're always thinking about me, even when I don't ask.",
+    "Everything is more fun with you. Packing, bad TV, long walks, doing absolutely nothing. Somehow you turn all of it into my favorite part of the day.",
+    "You're so funny. You dish the sass right back, match my wit, and somehow always catch me off guard in the best way.",
+    "You inspire me. You make me want to learn more, think deeper, and actually challenge my brain. And half the time, you know what I'm thinking before I even do.",
+    "With you, I get to be fully myself. No pretending, no shrinking, no feeling judged. Just me, exactly as I am, and that feels really rare.",
+    "You have the cutest cat ever. And yes, this is a direct shoutout to Cosima. I refuse to elaborate.",
+    "You make me feel like the most special girl in the world. Not in a big dramatic way. Just in the quiet, everyday way that actually matters."
   ];
 
   // Portrait emotion indices per reason
@@ -1230,7 +1230,9 @@
       const hx = heart.x;
       const hy = heart.y + bobOff;
 
-      if (dist(player.x, player.y, hx, hy) <= (player.r + heart.r) * 1.2) {
+      // Use sprite dimensions for collision so visual overlap matches
+      const collisionR = Math.max(player.r, spriteW * 0.4) + heart.r;
+      if (dist(player.x, player.y - spriteH * 0.35, hx, hy) <= collisionR) {
         heart.alive = false;
         collected++;
         if (navigator.vibrate) navigator.vibrate(18);
@@ -1512,7 +1514,22 @@
       const a = Math.min(1, p.life * 1.5);
       ctx.globalAlpha = a * 0.9;
       if (p.isHeart) {
-        drawMiniHeart(p.x, p.y, p.size * 1.6);
+        // Inline mini heart shape (replaces removed drawMiniHeart)
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        const s = p.size * 1.6;
+        const sc = s / 16;
+        ctx.scale(sc, sc);
+        ctx.beginPath();
+        ctx.moveTo(0, 4);
+        ctx.bezierCurveTo(0, -1, -10, -1, -10, 4);
+        ctx.bezierCurveTo(-10, 11, 0, 16, 0, 20);
+        ctx.bezierCurveTo(0, 16, 10, 11, 10, 4);
+        ctx.bezierCurveTo(10, -1, 0, -1, 0, 4);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(255, 120, 170, 0.7)";
+        ctx.fill();
+        ctx.restore();
       } else {
         ctx.fillStyle = p.color || "#ffaacc";
         ctx.fillRect(p.x, p.y, p.size, p.size);
