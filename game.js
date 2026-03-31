@@ -46,7 +46,6 @@
   };
 
   const sprites = {};
-  let assetsLoaded = false;
 
   function loadAssets() {
     return new Promise(resolve => {
@@ -843,7 +842,7 @@
       showOverlay(`
         <div class="card">
           <div class="h1">Hey ${HER_NAME} <span class="heart-icon">\u2665</span></div>
-          <p class="p">I made this little game just for you. There are <strong>10 hearts</strong> hidden across the meadow, and each one holds a special reason why you mean so much to me.</p>
+          <p class="p">I made this little game just for you. There are <strong>10 hearts</strong> hidden across the meadow, and each one holds a special reason why I LOVE YOU.</p>
           <p class="p">Walk around, find them all, and read every reason — there's a surprise waiting at the end!</p>
           <div class="row">
             <button class="btn" data-action="start">Let's Go!</button>
@@ -1006,8 +1005,6 @@
 
     setState(State.ENDING_SCENE);
   }
-
-  let endingAnswered = false; // set true when user clicks yes/absolutely yes
 
   function updateEndingScene(dt) {
     endingTimer += dt;
